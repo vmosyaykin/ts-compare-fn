@@ -6,6 +6,8 @@
 [![Package minified & gzipped size](https://badgen.net/bundlephobia/minzip/ts-compare-fn)](https://bundlephobia.com/package/ts-compare-fn)
 [![Package dependency count](https://badgen.net/bundlephobia/dependency-count/reactts-compare-fn)](https://bundlephobia.com/package/ts-compare-fn)
 
+Completely type-safe, autocomplete-friendly, and easy-to-use comparison functions for TypeScript.
+
 ## Installation
 
 This library is published in the NPM registry and can be installed using any compatible package manager.

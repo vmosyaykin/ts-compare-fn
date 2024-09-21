@@ -3,7 +3,7 @@
   "compilerOptions": {
     // Transpilation settings.
     "module": "ES2022",
-    "target": "ES5",
+    "target": "ES2022",
 
     // Output settings.
     "newLine": "LF",
