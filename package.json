@@ -55,7 +55,7 @@
         "type": "git",
         "url": "git+https://github.com/vmosyaykin/ts-compare-fn.git"
     },
-    "keywords": [],
+    "keywords": ["compare", "sort", "compare function", "sort function", "array"],
     "author": {
         "name": "Vladimir Mosyaykin"
     },
