@@ -1,52 +1,81 @@
 /*!
- * ts-compare-fn v0.0.0
+ * ts-compare-fn v1.0.0
  * (c) Vladimir Mosyaykin
  * Released under the MIT License.
  */
 
 'use strict';
 
-function createSortFn(...params) {
+function compareFn(...params) {
     const defaultLocale = 'en-u-co-eor-kn';
     let options = params[params.length - 1];
-    if (!options || !isComparatorOptions(options)) {
+    if (!options || !isLocaleOptions(options)) {
         options = {};
     }
-    if (!options.collator) {
-        options.collator = new Intl.Collator(options.locale ?? defaultLocale);
-    }
+    const resolvedOptions = {
+        ...(options && isLocaleOptions(options) ? options : {}),
+        collator: options.collator ??
+            new Intl.Collator(options.locale ?? defaultLocale),
+    };
     const comparators = [];
     for (const param of params) {
         if (isSortOption(param)) {
+            const isAscPath = isAscOption(param);
             comparators.push({
-                dir: isAscOption(param) ? 1 : -1,
-                path: isAscOption(param)
+                dir: isAscPath ? 1 : -1,
+                path: isAscPath
                     ? param
                     : param.substring(1),
-                ...options,
+                ...resolvedOptions,
             });
         }
-        if (isSortConfig(param)) {
+        if (isGetter(param)) {
+            comparators.push({
+                dir: 1,
+                get: param,
+                ...resolvedOptions,
+            });
+        }
+        if (isSortPathConfig(param)) {
+            const isAscPath = isAscOption(param.path);
             if (param.locale && !param.collator) {
                 param.collator = new Intl.Collator(param.locale);
             }
             comparators.push({
-                dir: param.direction === 'desc' || param.direction === -1
+                dir: param.order === 'desc' || param.order === -1
                     ? -1
-                    : 1,
-                ...options,
+                    : isAscPath
+                        ? 1
+                        : -1,
+                ...resolvedOptions,
+                ...param,
+                path: (isAscPath
+                    ? param.path
+                    : param.path.substring(1)),
+            });
+        }
+        if (isSortGetterConfig(param)) {
+            if (param.locale && !param.collator) {
+                param.collator = new Intl.Collator(param.locale);
+            }
+            comparators.push({
+                dir: param.order === 'desc' || param.order === -1 ? -1 : 1,
+                ...resolvedOptions,
                 ...param,
             });
         }
     }
     return (aObject, bObject) => {
         for (const comparator of comparators) {
-            const { dir, path, collator, defaultNumber, defaultString, transform, } = comparator;
-            let a = getByPath(aObject, path);
-            let b = getByPath(bObject, path);
-            if (transform) {
-                a = transform(a);
-                b = transform(b);
+            const { dir, path, collator, defaultValue, get } = comparator;
+            let a, b;
+            if (path) {
+                a = getByPath(aObject, path);
+                b = getByPath(bObject, path);
+            }
+            if (get) {
+                a = get(aObject);
+                b = get(bObject);
             }
             if (a === null)
                 a = undefined;
@@ -61,13 +90,13 @@ function createSortFn(...params) {
                 throw new Error(`Cannot compare ${typeof a} and ${typeof b}`);
             }
             const type = a ? typeof a : typeof b;
-            if (type === 'number') {
-                a = a ?? defaultNumber;
-                b = b ?? defaultNumber;
-            }
-            if (type === 'string') {
-                a = a ?? defaultString;
-                b = b ?? defaultString;
+            const instanceOfDate = a instanceof Date || b instanceof Date;
+            if (defaultValue !== undefined &&
+                defaultValue !== null &&
+                type === typeof defaultValue &&
+                instanceOfDate === defaultValue instanceof Date) {
+                a = a ?? defaultValue;
+                b = b ?? defaultValue;
             }
             if (a === undefined)
                 return dir;
@@ -105,10 +134,16 @@ function isAscOption(sortPath) {
 function isSortOption(sort) {
     return typeof sort === 'string';
 }
-function isSortConfig(sort) {
+function isGetter(sort) {
+    return typeof sort === 'function';
+}
+function isSortPathConfig(sort) {
     return typeof sort === 'object' && 'path' in sort;
 }
-function isComparatorOptions(sort) {
+function isSortGetterConfig(sort) {
+    return typeof sort === 'object' && 'get' in sort;
+}
+function isLocaleOptions(sort) {
     return typeof sort === 'object' && !('path' in sort);
 }
 function getByPath(obj, path) {
@@ -123,5 +158,5 @@ function getByPath(obj, path) {
     return result;
 }
 
-exports.createSortFn = createSortFn;
+exports.compareFn = compareFn;
 //# sourceMappingURL=index.cjs.map
