@@ -17,10 +17,10 @@ function createSortFn(...params) {
     }
     const comparators = [];
     for (const param of params) {
-        if (isSortPath(param)) {
+        if (isSortOption(param)) {
             comparators.push({
-                dir: isAscPath(param) ? 1 : -1,
-                path: isAscPath(param)
+                dir: isAscOption(param) ? 1 : -1,
+                path: isAscOption(param)
                     ? param
                     : param.substring(1),
                 ...options,
@@ -99,10 +99,10 @@ function createSortFn(...params) {
         return 0;
     };
 }
-function isAscPath(sortPath) {
+function isAscOption(sortPath) {
     return !sortPath.startsWith('-');
 }
-function isSortPath(sort) {
+function isSortOption(sort) {
     return typeof sort === 'string';
 }
 function isSortConfig(sort) {

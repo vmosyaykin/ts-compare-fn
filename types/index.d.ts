@@ -1,10 +1,6 @@
-type SortablePrimitive = number | boolean | string | bigint | undefined | null;
-type SortableObject = Date;
-type SortableValue = SortablePrimitive | SortableObject;
 type ComparatorOptions = {
     defaultString?: string;
     defaultNumber?: number;
-    transform?: (value: SortableValue) => SortableValue;
     locale?: string;
     collator?: Collator;
 };
@@ -12,22 +8,23 @@ type SortConfig<Type extends object> = {
     [Path in SortablePath<Type>]: {
         path: Path;
         direction?: 'asc' | 'desc' | -1 | 1;
-        transform?: (value: TypeAtPath<Type, Path>) => SortableValue;
-    } & Omit<ComparatorOptions, 'transform'>;
+        transform?: ((value: TypeAtPath<Type, Path>) => Nullishable<number>) | ((value: TypeAtPath<Type, Path>) => Nullishable<bigint>) | ((value: TypeAtPath<Type, Path>) => Nullishable<Date>) | ((value: TypeAtPath<Type, Path>) => Nullishable<string>) | ((value: TypeAtPath<Type, Path>) => Nullishable<boolean>);
+    } & ComparatorOptions;
 }[SortablePath<Type>];
-type Sort<Type extends object> = SortConfig<Type> | SortPath<Type>;
+type Sort<Type extends object> = SortConfig<Type> | SortOption<Type>;
 export declare function createSortFn<Type extends object>(...params: [Sort<Type>, ...Sort<Type>[], ComparatorOptions]): (a: Type, b: Type) => number;
 export declare function createSortFn<Type extends object>(...params: [Sort<Type>, ...Sort<Type>[]]): (a: Type, b: Type) => number;
-type NoSpecialChars<Key extends string | undefined> = Key extends `-${string}` ? never : `${Key}`;
+type NoSpecialChars<Key extends string | undefined> = Key extends `-${string}` | `${string}.${string}` ? never : `${Key}`;
 type Path<Object, Leaf, Index extends string = string> = Object extends object ? {
-    [Key in keyof Object]: Key extends Index ? Object[Key] extends Leaf ? NoSpecialChars<Key> : Object[Key] extends unknown[] ? `${Key}.${Path<Object[Key], Leaf, TupleKeys<Object[Key]>> | 'length'}` : Object[Key] extends object ? `${Key}.${Path<Object[Key], Leaf>}` : never : never;
+    [Key in keyof Object]: Key extends Index ? Object[Key] extends Leaf ? NoSpecialChars<Key> : Object[Key] extends unknown[] ? `${Key}.${Path<Object[Key], Leaf, TupleIndex<Object[Key]>> | 'length'}` : Object[Key] extends object ? `${Key}.${Path<Object[Key], Leaf>}` : never : never;
 }[keyof Object & Index] : never;
-type TupleKeys<T extends unknown[]> = Exclude<keyof T, keyof unknown[]> & string;
+type TupleIndex<Tuple extends unknown[]> = Exclude<keyof Tuple, keyof unknown[]> & string;
 type TypeAtPath<Object, Path extends string> = Path extends `${infer Key}.${infer Rest}` ? Key extends keyof Object ? TypeAtPath<Object[Key], Rest> : never : Path extends keyof Object ? Object[Path] : never;
-type SortablePath<Type> = Path<Type, SortableValue>;
-type AscPath<Type> = SortablePath<Type>;
-type DescPath<Type> = `-${SortablePath<Type>}`;
-type SortPath<Type> = AscPath<Type> | DescPath<Type>;
+type Nullishable<Type> = Type | null | undefined;
+type SortablePath<Type> = Path<Type, Nullishable<number>> | Path<Type, Nullishable<bigint>> | Path<Type, Nullishable<Date>> | Path<Type, Nullishable<string>> | Path<Type, Nullishable<boolean>>;
+type AscOption<Type> = SortablePath<Type>;
+type DescOption<Type> = `-${SortablePath<Type>}`;
+type SortOption<Type> = AscOption<Type> | DescOption<Type>;
 type Collator = {
     compare: (x: string, y: string) => number;
 };

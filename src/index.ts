@@ -1,70 +1,119 @@
-type SortablePrimitive = number | boolean | string | bigint | undefined | null;
-type SortableObject = Date;
-type SortableValue = SortablePrimitive | SortableObject;
+type SortConfig<Type extends object> =
+    | SortOption<Type>
+    | SortPathConfig<Type>
+    | Getter<Type>
+    | SortGetterConfig<Type>;
 
-type ComparatorOptions = {
-    defaultString?: string;
-    defaultNumber?: number;
-    transform?: (value: SortableValue) => SortableValue;
+type LocaleOptions = {
     locale?: string;
     collator?: Collator;
 };
 
-type SortConfig<Type extends object> = {
+type SortPathConfig<Type extends object> = {
     [Path in SortablePath<Type>]: {
-        path: Path;
-        direction?: 'asc' | 'desc' | -1 | 1;
-        transform?: (value: TypeAtPath<Type, Path>) => SortableValue;
-    } & Omit<ComparatorOptions, 'transform'>;
+        path: Path | `-${Path}`;
+        order?: 'asc' | 'desc' | -1 | 1;
+        defaultValue?: TypeAtPath<Type, Path>;
+    } & LocaleOptions;
 }[SortablePath<Type>];
 
-type Sort<Type extends object> = SortConfig<Type> | SortOption<Type>;
+type SortGetterConfig<Type extends object> = {
+    get: Getter<Type>;
+    order?: 'asc' | 'desc' | -1 | 1;
+} & LocaleOptions;
 
-export function createSortFn<Type extends object>(
-    ...params: [Sort<Type>, ...Sort<Type>[], ComparatorOptions]
+type SortOptionAndLocaleOptionsTuple<Type extends object> = {
+    [Path in SortablePath<Type>]: [
+        Path | `-${Path}`,
+        LocaleOptions & { defaultValue?: TypeAtPath<Type, Path> },
+    ];
+}[SortablePath<Type>];
+
+export function compareFn<Type extends object>(
+    ...params: SortOptionAndLocaleOptionsTuple<Type>
 ): (a: Type, b: Type) => number;
-export function createSortFn<Type extends object>(
-    ...params: [Sort<Type>, ...Sort<Type>[]]
+export function compareFn<Type extends object>(
+    ...params: [
+        SortConfig<Type>,
+        SortConfig<Type>,
+        ...SortConfig<Type>[],
+        LocaleOptions,
+    ]
 ): (a: Type, b: Type) => number;
-export function createSortFn<Type extends object>(
-    ...params: (Sort<Type> | ComparatorOptions)[]
+export function compareFn<Type extends object>(
+    ...params: [SortConfig<Type>, ...SortConfig<Type>[]]
+): (a: Type, b: Type) => number;
+export function compareFn<Type extends object>(
+    ...params: (SortConfig<Type> | LocaleOptions)[]
 ): (a: Type, b: Type) => number {
     const defaultLocale = 'en-u-co-eor-kn';
 
     let options = params[params.length - 1];
 
-    if (!options || !isComparatorOptions(options)) {
+    if (!options || !isLocaleOptions(options)) {
         options = {};
     }
 
-    if (!options.collator) {
-        options.collator = new Intl.Collator(options.locale ?? defaultLocale);
-    }
+    const resolvedOptions = {
+        ...(options && isLocaleOptions(options) ? options : {}),
+        collator:
+            options.collator ??
+            new Intl.Collator(options.locale ?? defaultLocale),
+    };
 
     const comparators: Comparator<Type>[] = [];
 
     for (const param of params) {
         if (isSortOption(param)) {
+            const isAscPath = isAscOption(param);
+
             comparators.push({
-                dir: isAscOption(param) ? 1 : -1,
-                path: isAscOption(param)
+                dir: isAscPath ? 1 : -1,
+                path: isAscPath
                     ? param
                     : (param.substring(1) as AscOption<Type>),
-                ...(options as typeof options & { collator: Collator }),
+                ...resolvedOptions,
             });
         }
 
-        if (isSortConfig(param)) {
+        if (isGetter(param)) {
+            comparators.push({
+                dir: 1,
+                get: param,
+                ...resolvedOptions,
+            });
+        }
+
+        if (isSortPathConfig(param)) {
+            const isAscPath = isAscOption(param.path);
+
             if (param.locale && !param.collator) {
                 param.collator = new Intl.Collator(param.locale);
             }
 
             comparators.push({
                 dir:
-                    param.direction === 'desc' || param.direction === -1
+                    param.order === 'desc' || param.order === -1
                         ? -1
-                        : 1,
-                ...(options as typeof options & { collator: Collator }),
+                        : isAscPath
+                          ? 1
+                          : -1,
+                ...resolvedOptions,
+                ...param,
+                path: (isAscPath
+                    ? param.path
+                    : param.path.substring(1)) as AscOption<Type>,
+            });
+        }
+
+        if (isSortGetterConfig(param)) {
+            if (param.locale && !param.collator) {
+                param.collator = new Intl.Collator(param.locale);
+            }
+
+            comparators.push({
+                dir: param.order === 'desc' || param.order === -1 ? -1 : 1,
+                ...resolvedOptions,
                 ...param,
             });
         }
@@ -72,21 +121,18 @@ export function createSortFn<Type extends object>(
 
     return (aObject, bObject) => {
         for (const comparator of comparators) {
-            const {
-                dir,
-                path,
-                collator,
-                defaultNumber,
-                defaultString,
-                transform,
-            } = comparator;
+            const { dir, path, collator, defaultValue, get } = comparator;
 
-            let a = getByPath(aObject, path);
-            let b = getByPath(bObject, path);
+            let a, b;
 
-            if (transform) {
-                a = transform(a);
-                b = transform(b);
+            if (path) {
+                a = getByPath(aObject, path);
+                b = getByPath(bObject, path);
+            }
+
+            if (get) {
+                a = get(aObject);
+                b = get(bObject);
             }
 
             if (a === null) a = undefined;
@@ -104,15 +150,16 @@ export function createSortFn<Type extends object>(
             }
 
             const type = a ? typeof a : typeof b;
+            const instanceOfDate = a instanceof Date || b instanceof Date;
 
-            if (type === 'number') {
-                a = a ?? defaultNumber;
-                b = b ?? defaultNumber;
-            }
-
-            if (type === 'string') {
-                a = a ?? defaultString;
-                b = b ?? defaultString;
+            if (
+                defaultValue !== undefined &&
+                defaultValue !== null &&
+                type === typeof defaultValue &&
+                instanceOfDate === defaultValue instanceof Date
+            ) {
+                a = a ?? defaultValue;
+                b = b ?? defaultValue;
             }
 
             if (a === undefined) return dir;
@@ -156,20 +203,31 @@ type NoSpecialChars<Key extends string | undefined> = Key extends
 
 type Path<Object, Leaf, Index extends string = string> = Object extends object
     ? {
-          [Key in keyof Object]: Key extends Index
-              ? Object[Key] extends Leaf
+          [Key in keyof Required<Object>]: Key extends Index
+              ? Required<Object>[Key] extends Leaf
                   ? NoSpecialChars<Key>
-                  : Object[Key] extends unknown[]
-                    ? `${Key}.${Path<Object[Key], Leaf, TupleIndex<Object[Key]>> | 'length'}`
-                    : Object[Key] extends object
-                      ? `${Key}.${Path<Object[Key], Leaf>}`
+                  : Required<Object>[Key] extends unknown[]
+                    ? `${Key}.${Path<Required<Object>[Key], Leaf, TupleIndex<Required<Object>[Key]>> | 'length'}`
+                    : Required<Object>[Key] extends object
+                      ? `${Key}.${Path<Required<Object>[Key], Leaf>}`
                       : never
               : never;
-      }[keyof Object & Index]
+      }[keyof Required<Object> & Index]
     : never;
 
-type TupleIndex<T extends unknown[]> = Exclude<keyof T, keyof unknown[]> &
+type TupleIndex<Tuple extends unknown[]> = Exclude<
+    keyof Tuple,
+    keyof unknown[]
+> &
     string;
+
+type Nullishable<Type> = Type | null | undefined;
+type SortablePath<Type> =
+    | Path<Type, Nullishable<number>>
+    | Path<Type, Nullishable<bigint>>
+    | Path<Type, Nullishable<Date>>
+    | Path<Type, Nullishable<string>>
+    | Path<Type, Nullishable<boolean>>;
 
 type TypeAtPath<
     Object,
@@ -182,11 +240,16 @@ type TypeAtPath<
       ? Object[Path]
       : never;
 
-type SortablePath<Type> = Path<Type, SortableValue>;
-
 type AscOption<Type> = SortablePath<Type>;
 type DescOption<Type> = `-${SortablePath<Type>}`;
 type SortOption<Type> = AscOption<Type> | DescOption<Type>;
+
+type Getter<Type extends object> =
+    | ((object: Type) => Nullishable<number>)
+    | ((object: Type) => Nullishable<bigint>)
+    | ((object: Type) => Nullishable<Date>)
+    | ((object: Type) => Nullishable<string>)
+    | ((object: Type) => Nullishable<boolean>);
 
 function isAscOption<Type>(
     sortPath: SortOption<Type>
@@ -195,29 +258,45 @@ function isAscOption<Type>(
 }
 
 function isSortOption<Type extends object>(
-    sort: Sort<Type> | ComparatorOptions
+    sort: SortConfig<Type> | LocaleOptions
 ): sort is SortOption<Type> {
     return typeof sort === 'string';
 }
 
-function isSortConfig<Type extends object>(
-    sort: Sort<Type> | ComparatorOptions
-): sort is SortConfig<Type> {
+function isGetter<Type extends object>(
+    sort: SortConfig<Type> | LocaleOptions
+): sort is Getter<Type> {
+    return typeof sort === 'function';
+}
+
+function isSortPathConfig<Type extends object>(
+    sort: SortConfig<Type> | LocaleOptions
+): sort is SortPathConfig<Type> {
     return typeof sort === 'object' && 'path' in sort;
 }
 
-function isComparatorOptions<Type extends object>(
-    sort: Sort<Type> | ComparatorOptions
-): sort is ComparatorOptions {
+function isSortGetterConfig<Type extends object>(
+    sort: SortConfig<Type> | LocaleOptions
+): sort is SortGetterConfig<Type> {
+    return typeof sort === 'object' && 'get' in sort;
+}
+
+function isLocaleOptions<Type extends object>(
+    sort: SortConfig<Type> | LocaleOptions
+): sort is LocaleOptions {
     return typeof sort === 'object' && !('path' in sort);
 }
+
+type Sortable = string | number | bigint | boolean | Date | null | undefined;
 
 type Collator = { compare: (x: string, y: string) => number };
 type Comparator<Type extends object> = {
     dir: 1 | -1;
-    path: SortablePath<Type>;
+    path?: SortablePath<Type> | undefined;
+    get?: (object: Type) => Sortable | undefined;
     collator: Collator;
-} & ComparatorOptions;
+    defaultValue?: unknown;
+} & LocaleOptions;
 
 function getByPath<Type extends object>(obj: Type, path: SortablePath<Type>) {
     const parts = path.split('.');
@@ -232,5 +311,5 @@ function getByPath<Type extends object>(obj: Type, path: SortablePath<Type>) {
         result = result[part as keyof object];
     }
 
-    return result as SortableValue;
+    return result as Sortable;
 }

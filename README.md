@@ -1,44 +1,322 @@
 # ts-compare-fn
 
-[![Continuous Integrations](https://github.com/vmosyaykin/ts-compare-fn/actions/workflows/continuous-integrations.yaml/badge.svg?branch=main)](https://github.com/vmosyaykin/ts-compare-fn/actions/workflows/continuous-integrations.yaml)
 [![License](https://badgen.net/github/license/vmosyaykin/ts-compare-fn)](./LICENSE)
-[![Package tree-shaking](https://badgen.net/bundlephobia/tree-shaking/ts-compare-fn)](https://bundlephobia.com/package/ts-compare-fn)
 [![Package minified & gzipped size](https://badgen.net/bundlephobia/minzip/ts-compare-fn)](https://bundlephobia.com/package/ts-compare-fn)
-[![Package dependency count](https://badgen.net/bundlephobia/dependency-count/reactts-compare-fn)](https://bundlephobia.com/package/ts-compare-fn)
 
-Completely type-safe, autocomplete-friendly, and easy-to-use comparison functions for TypeScript.
+Type-safe, autocomplete-friendly, and intuitive compare function creator
+with sensible defaults and a highly customizable API.
+
+- Sort an array of objects by a single or multiple keys
+- Supports nested paths, including in tuples, and custom getters
+- Provides robust type inference and autocomplete support
+- Works with strings, numbers, bigints, booleans, and dates
+- Uses [Intl.Collator](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/Collator)
+to compare strings for localization support
+- Default locale is environment-independent
+for consistency and better SSR compatibility
+- Uses [numeric](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/Collator/Collator#numeric)
+collation by default, so that `"10.jpg", "1.jpg", "2.jpg"`
+sorts as `"1.jpg", "2.jpg", "10.jpg"`
+- Gracefully handles `null` and `undefined` values
 
 ## Installation
 
-This library is published in the NPM registry and can be installed using any compatible package manager.
+This library is published in the NPM registry and can be installed
+using any compatible package manager.
 
 ```sh
+# NPM
 npm install ts-compare-fn --save
 
-# For Yarn, use the command below.
+# Yarn
 yarn add ts-compare-fn
 ```
 
-### Installation from CDN
+## Usage
 
-This module has an UMD bundle available through JSDelivr and Unpkg CDNs.
+### Basic
+Pick a property name to sort by. The function will infer
+the type of the property and return a compare function
+to use with `Array.prototype.sort` or `Array.prototype.toSorted`.
+```typescript
+import { createCompareFn } from 'ts-compare-fn';
 
-```html
-<!-- For UNPKG use the code below. -->
-<script src="https://unpkg.com/ts-compare-fn"></script>
+type User = {
+  id: number;
+  name: string;
+  address: {
+    city: string;
+  };
+  emails: [string, string];
+};
 
-<!-- For JSDelivr use the code below. -->
-<script src="https://cdn.jsdelivr.net/npm/ts-compare-fn"></script>
+const users: User[] = [...];
 
-<script>
-  // UMD module is exposed through the "tsCompareFn" global variable.
-  console.log(tsCompareFn);
-</script>
+// Sort by a single property
+users.sort(createCompareFn('name'));
+users.sort(createCompareFn('id'));
+
+// To sort in descending order, prepend the property name with '-'
+users.sort(createCompareFn('-name'));
+
+// To sort by a nested property, use a dot-separated path
+users.sort(createCompareFn('address.city'));
+users.sort(createCompareFn('emails.0'));
+
+// Sort by multiple properties
+users.sort(createCompareFn('address.city', 'name'));
 ```
 
-## Documentation
+This works with array literals and standard TypeScript inference as well.
+```typescript
+const users = [
+  { name: 'Charlie', address: { city: 'New York' } },
+  { name: 'Bob', address: { city: 'London' } },
+  { name: 'Alice', address: { city: 'New York' } },
+].sort(createCompareFn('address.city', 'name'));
+```
 
-[Documentation generated from source files by Typedoc](./docs/README.md).
+You can also create a type-specific `compare` function once and use
+it throughout your codebase.
+```typescript
+import { createCompareFn } from 'ts-compare-fn';
+
+interface User {
+  name: string;
+  dateOfBirth: Date;
+}
+
+export const compareUsers = createCompareFn<User>('name', 'dateOfBirth');
+```
+
+### Custom getters
+This library allows you to pass a custom getter function to extract
+a value from an object. This is useful when you need to sort by
+a computed value or implement a custom sorting logic.
+```typescript
+import { createCompareFn } from 'ts-compare-fn';
+
+type User = { dateOfBirth: Date; name: string; };
+const users: User[] = [...];
+
+// Sort by a custom getter
+users.sort(createCompareFn((user) => daysTillBirthday(user.dateOfBirth)));
+
+// Mix and match with property names
+users.sort(createCompareFn('name', (user) => daysTillBirthday(user.dateOfBirth)));
+```
+
+*Note: getter return values are not cached,
+so it should be a pure function
+(always return the same value for the same object)*
+
+### Options
+
+#### Locale
+The default locale is `en-u-co-eor-kn`, which means strings
+are compared using the [European ordering rules](https://en.wikipedia.org/wiki/European_ordering_rules)
+and the [numeric](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/Collator/Collator#numeric)
+collation.
+You can customize this by passing an options object as the last argument.
+```typescript
+import { createCompareFn } from 'ts-compare-fn';
+
+type User = { name: string; age: number; city: string; };
+const users: User[] = [...];
+
+// Sort using custom locale
+users.sort(createCompareFn('name', { locale: 'fr' }));
+
+// Or provide a custom collator instance for more control
+users.sort(createCompareFn(
+  'age',
+  'name',
+  { collator: new Intl.Collator('fr', { sensitivity: 'case' }) }
+));
+
+// You can also specify locale or collator for a specific property
+users.sort(createCompareFn(
+  { path: 'city', collator: new Intl.Collator('en-US') },
+  { path: 'name', locale: 'fr' }
+));
+```
+
+#### Default values
+By default, `null` and `undefined` values are sorted to the end of the array
+(beginning of the array for descending order).
+You can customize this behavior by passing
+a custom default value for a property.
+```typescript
+import { createCompareFn } from 'ts-compare-fn';
+
+const compounds = [
+  { name: 'Water', formula: 'H₂0' },
+  { name: 'Carbon dioxide', formula: 'CO₂', freezingPoint: -78.5 },
+  { name: 'Glycerol', formula: 'C₃H₈O₃', freezingPoint: 17.8 },
+];
+
+// By default, undefined values are sorted to the end
+compounds.sort(createCompareFn('freezingPoint')); // CO₂, C₃H₈O₃, H₂0
+
+// You can specify a custom default value
+compounds.sort(createCompareFn(
+  'freezingPoint',
+  { defaultValue: 0 }
+)); // CO₂, H₂0, C₃H₈O₃
+```
+
+If you want to sort by multiple properties and provide
+default values for some of them, you need to provide
+a sort config object with the `path` and `defaultValue` properties.
+```typescript
+compounds.sort(createCompareFn(
+  { path: 'freezingPoint', defaultValue: 0 },
+  'formula',
+));
+```
+
+## API
+
+### createCompareFn<Type>(path, options?)
+
+#### path
+
+``` SortablePath<Type> | `-${SortablePath<Type>}` ```
+
+- A property name or a dot-separated path to sort by.
+```typescript
+const users: { name: string; address: { city: string } }[] = [...];
+
+users.sort(createCompareFn('name'));
+users.sort(createCompareFn('address.city'));
+```
+- Prepend with `-` to sort in descending order.
+```typescript
+users.sort(createCompareFn('-name'));
+```
+- Path should lead to a property of type `number`, `string`, `boolean`, `bigint`, or `Date`
+- Nullishable paths are allowed
+```typescript
+type Address = { city?: string };
+type AddressWithNull = { city: string | null | undefined };
+
+createCompareFn<Address>('city');
+createCompareFn<AddressWithNull>('city');
+```
+- Mixed-typed paths are not allowed
+```typescript
+type Address = { zip: number | string };
+
+// Will raise a type error
+createCompareFn<Address>('zip');
+
+// Use a custom getter instead to coerce values to the same type
+createCompareFn<Address>((address) => String(address.zip));
+```
+- Sorting by a tuple element is supported, but not an array element
+```typescript
+type User = { emails: [string, string], favorites: string[] };
+
+createCompareFn<User>('emails.0');
+
+// Will raise a type error
+createCompareFn<User>('favorites.0');
+
+// For non-empty arrays, use a [Type, ...Type[]] syntax
+type User = { phones: [string, ...string[]] };
+createCompareFn<User>('phones.0');
+```
+
+#### options
+
+``` { locale?, collator? } & { defaultValue? } ```
+
+##### locale (optional)
+A string representing the locale to use for string comparison.
+See [Intl.Collator#locales](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/Collator/Collator#locales).
+Ignored if `collator` is provided.
+##### collator (optional)
+An instance of `Intl.Collator` to use for string comparison.
+See [Intl.Collator](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/Collator).
+You can also provide a custom object with the `compare` method that has the signature `(a: string, b: string) => number`.
+#### defaultValue (optional)
+A value to use for sorting `null` and `undefined` values.
+Should be of the same type as the property being sorted.
+
+### createCompareFn(getter, options?)
+
+#### getter
+
+``` (item: Type) => number | undefined | null ```
+
+``` (item: Type) => string | undefined | null ```
+
+``` (item: Type) => boolean | undefined | null ```
+
+``` (item: Type) => bigint | undefined | null ```
+
+``` (item: Type) => Date | undefined | null ```
+
+- A function that takes an object of type `Type` and returns a value to sort by.
+- The return value should be of type `number`, `string`, `boolean`, `bigint`, or `Date`.
+- Nullishable return values are allowed.
+- The function should be pure (always return the same value for the same object).
+- Getter return values are not cached, so it should not perform heavy computations
+when dealing with large arrays.
+
+#### options
+
+``` { locale?, collator? } ```
+
+See [locale](#locale-optional) and [collator](#collator-optional) for details.
+
+### createCompareFn(...sortConfigs, options?)
+
+#### SortConfig<Type>
+
+``` SortablePath<Type> | `-${SortablePath<Type>}` | Getter<Type> ```
+- A property name, a dot-separated path, or a custom getter to sort by. See [path](#path) and [getter](#getter) for details.
+
+``` { path: SortablePath<Type> | `-${SortablePath<Type>}`, ...options? } ```
+``` { get: Getter<Type>, ...options? } ```
+- A way to provide different options for each property being sorted.
+- See [path](#path), [getter](#getter), and [options](#options) for details.
+
+```typescript
+import { createCompareFn } from 'ts-compare-fn';
+
+type Village = {
+  name: string;
+  country: string;
+  longitude: number;
+  latitude: number;
+};
+const villages: Village[] = [...];
+
+// Sort by multiple properties with custom options
+villages.sort(createCompareFn(
+  {
+    path: 'country',
+    collator: new Intl.Collator('fr', { sensitivity: 'base' })
+  },
+  {
+    path: 'name',
+    locale: 'fr'
+  },
+  {
+    get: ({ longitude, latitude }) => getNearestCity(longitude, latitude),
+    defaultValue: 'Paris',
+  }
+));
+```
+
+#### options
+
+``` { locale?, collator? } ```
+
+See [locale](#locale-optional) and [collator](#collator-optional) for details.
+
+
 
 ## License
 
