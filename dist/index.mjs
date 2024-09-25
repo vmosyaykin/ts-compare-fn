@@ -1,5 +1,5 @@
 /*!
- * ts-compare-fn v1.0.0
+ * ts-compare-fn v1.0.2
  * (c) Vladimir Mosyaykin
  * Released under the MIT License.
  */

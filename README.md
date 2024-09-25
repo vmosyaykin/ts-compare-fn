@@ -39,7 +39,7 @@ Pick a property name to sort by. The function will infer
 the type of the property and return a compare function
 to use with `Array.prototype.sort` or `Array.prototype.toSorted`.
 ```typescript
-import { createCompareFn } from 'ts-compare-fn';
+import { compareFn } from 'ts-compare-fn';
 
 type User = {
   id: number;
@@ -53,18 +53,18 @@ type User = {
 const users: User[] = [...];
 
 // Sort by a single property
-users.sort(createCompareFn('name'));
-users.sort(createCompareFn('id'));
+users.sort(compareFn('name'));
+users.sort(compareFn('id'));
 
 // To sort in descending order, prepend the property name with '-'
-users.sort(createCompareFn('-name'));
+users.sort(compareFn('-name'));
 
 // To sort by a nested property, use a dot-separated path
-users.sort(createCompareFn('address.city'));
-users.sort(createCompareFn('emails.0'));
+users.sort(compareFn('address.city'));
+users.sort(compareFn('emails.0'));
 
 // Sort by multiple properties
-users.sort(createCompareFn('address.city', 'name'));
+users.sort(compareFn('address.city', 'name'));
 ```
 
 This works with array literals and standard TypeScript inference as well.
@@ -73,20 +73,20 @@ const users = [
   { name: 'Charlie', address: { city: 'New York' } },
   { name: 'Bob', address: { city: 'London' } },
   { name: 'Alice', address: { city: 'New York' } },
-].sort(createCompareFn('address.city', 'name'));
+].sort(compareFn('address.city', 'name'));
 ```
 
 You can also create a type-specific `compare` function once and use
 it throughout your codebase.
 ```typescript
-import { createCompareFn } from 'ts-compare-fn';
+import { compareFn } from 'ts-compare-fn';
 
 interface User {
   name: string;
   dateOfBirth: Date;
 }
 
-export const compareUsers = createCompareFn<User>('name', 'dateOfBirth');
+export const compareUsers = compareFn<User>('name', 'dateOfBirth');
 ```
 
 ### Custom getters
@@ -94,16 +94,16 @@ This library allows you to pass a custom getter function to extract
 a value from an object. This is useful when you need to sort by
 a computed value or implement a custom sorting logic.
 ```typescript
-import { createCompareFn } from 'ts-compare-fn';
+import { compareFn } from 'ts-compare-fn';
 
 type User = { dateOfBirth: Date; name: string; };
 const users: User[] = [...];
 
 // Sort by a custom getter
-users.sort(createCompareFn((user) => daysTillBirthday(user.dateOfBirth)));
+users.sort(compareFn((user) => daysTillBirthday(user.dateOfBirth)));
 
 // Mix and match with property names
-users.sort(createCompareFn('name', (user) => daysTillBirthday(user.dateOfBirth)));
+users.sort(compareFn('name', (user) => daysTillBirthday(user.dateOfBirth)));
 ```
 
 *Note: getter return values are not cached,
@@ -119,23 +119,23 @@ and the [numeric](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Refere
 collation.
 You can customize this by passing an options object as the last argument.
 ```typescript
-import { createCompareFn } from 'ts-compare-fn';
+import { compareFn } from 'ts-compare-fn';
 
 type User = { name: string; age: number; city: string; };
 const users: User[] = [...];
 
 // Sort using custom locale
-users.sort(createCompareFn('name', { locale: 'fr' }));
+users.sort(compareFn('name', { locale: 'fr' }));
 
 // Or provide a custom collator instance for more control
-users.sort(createCompareFn(
+users.sort(compareFn(
   'age',
   'name',
   { collator: new Intl.Collator('fr', { sensitivity: 'case' }) }
 ));
 
 // You can also specify locale or collator for a specific property
-users.sort(createCompareFn(
+users.sort(compareFn(
   { path: 'city', collator: new Intl.Collator('en-US') },
   { path: 'name', locale: 'fr' }
 ));
@@ -147,7 +147,7 @@ By default, `null` and `undefined` values are sorted to the end of the array
 You can customize this behavior by passing
 a custom default value for a property.
 ```typescript
-import { createCompareFn } from 'ts-compare-fn';
+import { compareFn } from 'ts-compare-fn';
 
 const compounds = [
   { name: 'Water', formula: 'H₂0' },
@@ -156,10 +156,10 @@ const compounds = [
 ];
 
 // By default, undefined values are sorted to the end
-compounds.sort(createCompareFn('freezingPoint')); // CO₂, C₃H₈O₃, H₂0
+compounds.sort(compareFn('freezingPoint')); // CO₂, C₃H₈O₃, H₂0
 
 // You can specify a custom default value
-compounds.sort(createCompareFn(
+compounds.sort(compareFn(
   'freezingPoint',
   { defaultValue: 0 }
 )); // CO₂, H₂0, C₃H₈O₃
@@ -169,7 +169,7 @@ If you want to sort by multiple properties and provide
 default values for some of them, you need to provide
 a sort config object with the `path` and `defaultValue` properties.
 ```typescript
-compounds.sort(createCompareFn(
+compounds.sort(compareFn(
   { path: 'freezingPoint', defaultValue: 0 },
   'formula',
 ));
@@ -177,7 +177,7 @@ compounds.sort(createCompareFn(
 
 ## API
 
-### createCompareFn<Type>(path, options?)
+### compareFn<Type>(path, options?)
 
 #### path
 
@@ -187,12 +187,12 @@ compounds.sort(createCompareFn(
 ```typescript
 const users: { name: string; address: { city: string } }[] = [...];
 
-users.sort(createCompareFn('name'));
-users.sort(createCompareFn('address.city'));
+users.sort(compareFn('name'));
+users.sort(compareFn('address.city'));
 ```
 - Prepend with `-` to sort in descending order.
 ```typescript
-users.sort(createCompareFn('-name'));
+users.sort(compareFn('-name'));
 ```
 - Path should lead to a property of type `number`, `string`, `boolean`, `bigint`, or `Date`
 - Nullishable paths are allowed
@@ -200,31 +200,31 @@ users.sort(createCompareFn('-name'));
 type Address = { city?: string };
 type AddressWithNull = { city: string | null | undefined };
 
-createCompareFn<Address>('city');
-createCompareFn<AddressWithNull>('city');
+compareFn<Address>('city');
+compareFn<AddressWithNull>('city');
 ```
 - Mixed-typed paths are not allowed
 ```typescript
 type Address = { zip: number | string };
 
 // Will raise a type error
-createCompareFn<Address>('zip');
+compareFn<Address>('zip');
 
 // Use a custom getter instead to coerce values to the same type
-createCompareFn<Address>((address) => String(address.zip));
+compareFn<Address>((address) => String(address.zip));
 ```
 - Sorting by a tuple element is supported, but not an array element
 ```typescript
 type User = { emails: [string, string], favorites: string[] };
 
-createCompareFn<User>('emails.0');
+compareFn<User>('emails.0');
 
 // Will raise a type error
-createCompareFn<User>('favorites.0');
+compareFn<User>('favorites.0');
 
 // For non-empty arrays, use a [Type, ...Type[]] syntax
 type User = { phones: [string, ...string[]] };
-createCompareFn<User>('phones.0');
+compareFn<User>('phones.0');
 ```
 
 #### options
@@ -243,7 +243,7 @@ You can also provide a custom object with the `compare` method that has the sign
 A value to use for sorting `null` and `undefined` values.
 Should be of the same type as the property being sorted.
 
-### createCompareFn(getter, options?)
+### compareFn(getter, options?)
 
 #### getter
 
@@ -270,7 +270,7 @@ when dealing with large arrays.
 
 See [locale](#locale-optional) and [collator](#collator-optional) for details.
 
-### createCompareFn(...sortConfigs, options?)
+### compareFn(...sortConfigs, options?)
 
 #### SortConfig<Type>
 
@@ -283,7 +283,7 @@ See [locale](#locale-optional) and [collator](#collator-optional) for details.
 - See [path](#path), [getter](#getter), and [options](#options) for details.
 
 ```typescript
-import { createCompareFn } from 'ts-compare-fn';
+import { compareFn } from 'ts-compare-fn';
 
 type Village = {
   name: string;
@@ -294,7 +294,7 @@ type Village = {
 const villages: Village[] = [...];
 
 // Sort by multiple properties with custom options
-villages.sort(createCompareFn(
+villages.sort(compareFn(
   {
     path: 'country',
     collator: new Intl.Collator('fr', { sensitivity: 'base' })
@@ -314,7 +314,10 @@ villages.sort(createCompareFn(
 
 ``` { locale?, collator? } ```
 
+Global options that apply to all properties being sorted.
 See [locale](#locale-optional) and [collator](#collator-optional) for details.
+
+Options provided in `SortConfig` objects take precedence over global options.
 
 
 
