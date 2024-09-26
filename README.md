@@ -1,6 +1,7 @@
 # ts-compare-fn
 
-[![License](https://badgen.net/github/license/vmosyaykin/ts-compare-fn)](./LICENSE)
+[![View this project on NPM](https://badgen.net/npm/v/ts-compare-fn)](https://www.npmjs.com/package/ts-compare-fn)
+[![License](https://badgen.net/github/license/vmosyaykin/ts-compare-fn/)](./LICENSE)
 [![Package minified & gzipped size](https://badgen.net/bundlephobia/minzip/ts-compare-fn)](https://bundlephobia.com/package/ts-compare-fn)
 
 Type-safe, autocomplete-friendly, and intuitive compare function creator
