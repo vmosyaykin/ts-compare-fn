@@ -7,9 +7,10 @@
 # Node.js modules.
 node_modules/
 
-# NPM's shrinkwrap.
-# We're using `package-lock.json` instead.
-npm-shrinkwrap.json
+# Compiled files.
+/dist/
+/types/index.d.ts
+/types/index.d.ts.map
 
 # Yarn's lockfile, Plug'n'Play, folder and settings.
 # We're using npm, and it provides its lockfile and settings.
