@@ -207,7 +207,7 @@ type Path<Object, Leaf, Index extends string = string> = Object extends object
               ? Required<Object>[Key] extends Leaf
                   ? NoSpecialChars<Key>
                   : Required<Object>[Key] extends unknown[]
-                    ? `${Key}.${Path<Required<Object>[Key], Leaf, TupleIndex<Required<Object>[Key]>> | 'length'}`
+                    ? `${Key}.${(Path<Required<Object>[Key], Leaf, TupleIndex<Required<Object>[Key]>> | 'length') & string}`
                     : Required<Object>[Key] extends object
                       ? `${Key}.${Path<Required<Object>[Key], Leaf>}`
                       : never
@@ -305,7 +305,7 @@ function getByPath<Type extends object>(obj: Type, path: SortablePath<Type>) {
 
     for (const part of parts) {
         if (typeof result !== 'object' || result === null) {
-            throw new Error(`Invalid path: ${path}`);
+            return undefined;
         }
 
         result = result[part as keyof object];

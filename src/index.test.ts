@@ -1,6 +1,6 @@
 import { compareFn } from './index';
 
-describe('createSortFn - sort by path', () => {
+describe('compareFn - compare by path', () => {
     it('should compare by specified property', () => {
         const users = [
             { name: 'Alice', id: 4, admin: true },
@@ -148,9 +148,26 @@ describe('createSortFn - sort by path', () => {
             { name: 'Dog', favorites: ['banana', 'bread', 'cheese'] },
         ]);
     });
+
+    it('should handle nested optional properties', () => {
+        const users = [
+            { name: 'Alice' },
+            { name: 'Bob', address: { city: 'Zagreb' } },
+            { name: 'Charlie', address: { city: 'Yerevan' } },
+            { name: 'David', address: { city: 'Xalapa' } },
+        ];
+
+        users.sort(compareFn('address.city'));
+        expect(users).toEqual([
+            { name: 'David', address: { city: 'Xalapa' } },
+            { name: 'Charlie', address: { city: 'Yerevan' } },
+            { name: 'Bob', address: { city: 'Zagreb' } },
+            { name: 'Alice' },
+        ]);
+    });
 });
 
-describe('createSortFn - sort by path config', () => {
+describe('compareFn - compare by path config', () => {
     it('should compare by specified property and order', () => {
         const users = [
             { name: 'Alice', id: 4 },
@@ -177,7 +194,7 @@ describe('createSortFn - sort by path config', () => {
     });
 });
 
-describe('createSortFn - sort by getter', () => {
+describe('compareFn - compare by getter', () => {
     it('should compare by getter function', () => {
         const users = [
             { name: 'Alice', birthday: '1990-12-01' },
@@ -238,8 +255,8 @@ describe('createSortFn - sort by getter', () => {
     });
 });
 
-describe('createSortFn - secondary sorting', () => {
-    it('should sort by multiple properties', () => {
+describe('compareFn - secondary sorting', () => {
+    it('should compare by multiple properties', () => {
         const users = [
             { name: 'Alice', id: 4, admin: true },
             { name: 'Bob', id: 3, admin: false },
@@ -279,7 +296,7 @@ describe('createSortFn - secondary sorting', () => {
     });
 });
 
-describe('createSortFn - options', () => {
+describe('compareFn - options', () => {
     it('should use custom locale if provided', () => {
         const users = [
             { name: 'Zlice', id: 1 },
