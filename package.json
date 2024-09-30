@@ -1,6 +1,6 @@
 {
     "name": "ts-compare-fn",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "description": "Type-safe and autocomplete-friendly compare function creator with sensible defaults.",
     "cdn": "dist/index.umd.js",
     "main": "dist/index.js",
@@ -61,7 +61,13 @@
         "type": "git",
         "url": "git+https://github.com/vmosyaykin/ts-compare-fn.git"
     },
-    "keywords": ["compare", "sort", "compare function", "sort function", "array"],
+    "keywords": [
+        "compare",
+        "sort",
+        "compare function",
+        "sort function",
+        "array"
+    ],
     "author": {
         "name": "Vladimir Mosyaykin"
     },
